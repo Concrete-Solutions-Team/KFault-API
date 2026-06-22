@@ -1,0 +1,9 @@
+build/
+.vscode/
+*.o
+*.out
+a.out
+.cache/
+compile_commands.json
+.cache/
+build-windows/
