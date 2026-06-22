@@ -1,9 +1,18 @@
-build/
-.vscode/
-*.o
+# binaries
+bin/
+*.exe
+
+# env
+.env
+
+# go build cache
+*.test
 *.out
-a.out
-.cache/
-compile_commands.json
-.cache/
-build-windows/
+
+# ide
+.idea/
+.vscode/
+
+# os
+.DS_Store
+Thumbs.db
