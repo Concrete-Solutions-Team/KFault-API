@@ -23,12 +23,16 @@ func main() {
 		log.Fatal("db connection failed", err)
 	}
 	log.Println("db connected")
+	fmt.Println("DB URL:", os.Getenv("DATABASE_URL"))
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Whatever"))
 	})
 	r.Get("/ws", handler.HandleWS)
+
+	r.Post("/auth/register", handler.HandleRegister)
+
 	fmt.Println("kfault server on port", port)
 
 	http.ListenAndServe(":"+port, r)

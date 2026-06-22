@@ -12,7 +12,7 @@ var Pool *pgxpool.Pool
 
 func Connect() error {
 	var err error
-	Pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+	Pool, err = pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	fmt.Println(Pool.Ping(context.Background()))
 	return err
 }
