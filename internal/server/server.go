@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -22,6 +23,8 @@ func NewServer(port string) *Server {
 	s := &Server{
 		router: chi.NewRouter(),
 	}
+
+	s.router.Use(middleware.Logger)
 
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),

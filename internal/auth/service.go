@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Concrete-Solutions-Team/KFault-API/internal/types"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -38,7 +37,7 @@ func (s *Service) Register(ctx context.Context, u *UserReq) (string, error) {
 		return "", err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, types.CustomClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, CustomClaims{
 		UserID:   id.String(),
 		Username: u.Username,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -65,7 +64,7 @@ func (s *Service) Login(ctx context.Context, u *UserReq) (string, error) {
 		return "", fmt.Errorf("invalid credentials")
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, types.CustomClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, CustomClaims{
 		UserID:   user.ID.String(),
 		Username: user.Username,
 		RegisteredClaims: jwt.RegisteredClaims{

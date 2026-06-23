@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/Concrete-Solutions-Team/KFault-API/internal/types"
 )
 
 type Message struct {
@@ -96,13 +94,13 @@ type ProfileResponse struct {
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(types.UserContextKey)
+	val := r.Context().Value(UserContextKey)
 	if val == nil {
 		fmt.Println("Context value is nil!")
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	claims, ok := val.(*types.CustomClaims)
+	claims, ok := val.(*CustomClaims)
 	if !ok {
 		fmt.Printf("Context value is of wrong type: %T\n", val)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
