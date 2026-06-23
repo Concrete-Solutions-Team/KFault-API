@@ -1,111 +1,97 @@
 package handler
 
-import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"time"
+// type Message struct {
+// 	Data  string
+// 	Type  string
+// 	Where string
+// }
 
-	"github.com/Concrete-Solutions-Team/KFault-API/internal/db"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/websocket"
-	"golang.org/x/crypto/bcrypt"
-)
+// func HandleWS(w http.ResponseWriter, r *http.Request) {
 
-type Message struct {
-	Data  string
-	Type  string
-	Where string
-}
+// 	var upgrader = websocket.Upgrader{
+// 		ReadBufferSize:  1024,
+// 		WriteBufferSize: 1024,
+// 		CheckOrigin: func(r *http.Request) bool {
+// 			return true
+// 		},
+// 	}
 
-func HandleWS(w http.ResponseWriter, r *http.Request) {
+// 	conn, err := upgrader.Upgrade(w, r, nil)
 
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
+// 	if err != nil {
+// 		log.Println(err)
+// 		return
+// 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+// 	for {
+// 		messageType, p, err := conn.ReadMessage()
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
+// 		messageJSON := string(p)
+// 		fmt.Println(messageJSON)
 
-	if err != nil {
-		log.Println(err)
-		return
-	}
+// 		if err := conn.WriteMessage(messageType, p); err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
 
-	for {
-		messageType, p, err := conn.ReadMessage()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		messageJSON := string(p)
-		fmt.Println(messageJSON)
+// 	}
 
-		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return
-		}
+// 	// conn.WriteMessage(websocket.TextMessage, []byte("Websocket test"))
+// }
 
-	}
+// type RegisterRequest struct {
+// 	Username string `json:"username"`
+// 	Password string `json:"password"`
+// }
+// type RegisterResponse struct {
+// 	Token string `json:"token"`
+// }
 
-	// conn.WriteMessage(websocket.TextMessage, []byte("Websocket test"))
-}
+// func HandleRegister(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
 
-type RegisterRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-type RegisterResponse struct {
-	Token string `json:"token"`
-}
+// 	ctx := r.Context()
+// 	var req RegisterRequest
 
-func HandleRegister(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+// 	err := json.NewDecoder(r.Body).Decode(&req)
+// 	if err != nil {
+// 		http.Error(w, "invalid request body", http.StatusBadRequest)
+// 		return
+// 	}
 
-	ctx := r.Context()
-	var req RegisterRequest
+// 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("Bcrypt failed: %v", err), http.StatusBadRequest)
+// 		return
+// 	}
+// 	var userID string
+// 	err = db.Pool.QueryRow(ctx,
+// 		"INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id::text",
+// 		req.Username, string(hash),
+// 	).Scan(&userID)
 
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("Query failed: %v", err), http.StatusBadRequest)
+// 		return
+// 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Bcrypt failed: %v", err), http.StatusBadRequest)
-		return
-	}
-	var userID string
-	err = db.Pool.QueryRow(ctx,
-		"INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id::text",
-		req.Username, string(hash),
-	).Scan(&userID)
+// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"user_id": userID, "exp": time.Now().Add(24 * time.Hour).Unix()})
 
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Query failed: %v", err), http.StatusBadRequest)
-		return
-	}
+// 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+// 	if err != nil {
+// 		http.Error(w, "failed to sign token", http.StatusInternalServerError)
+// 		return
+// 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"user_id": userID, "exp": time.Now().Add(24 * time.Hour).Unix()})
-
-	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
-	if err != nil {
-		http.Error(w, "failed to sign token", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	data := RegisterResponse{
-		Token: tokenString,
-	}
-	if err = json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode JSON: %v", err), http.StatusBadRequest)
-		return
-	}
-}
+// 	w.WriteHeader(http.StatusOK)
+// 	data := RegisterResponse{
+// 		Token: tokenString,
+// 	}
+// 	if err = json.NewEncoder(w).Encode(data); err != nil {
+// 		http.Error(w, fmt.Sprintf("Failed to encode JSON: %v", err), http.StatusBadRequest)
+// 		return
+// 	}
+// }
