@@ -1,41 +1,25 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
-	"os"
 
-	"github.com/Concrete-Solutions-Team/KFault-API/internal/db"
-	"github.com/Concrete-Solutions-Team/KFault-API/internal/handler"
-	"github.com/go-chi/chi/v5"
-	"github.com/joho/godotenv"
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/config"
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/server"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	port := os.Getenv("PORT")
+	cfg := config.LoadConfig()
 
-	if err := db.Connect(); err != nil {
-		log.Fatal("db connection failed", err)
-	}
-	log.Println("db connected")
-	fmt.Println("DB URL:", os.Getenv("DATABASE_URL"))
-	r := chi.NewRouter()
-
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Whatever"))
-	})
-	r.Get("/ws", handler.HandleWS)
+	// pool := db.InitPostgres(cfg.DatabaseURL)
 
 	r.Post("/auth/register", handler.HandleRegister)
 	r.Post("/auth/login", handler.HandleLogin)
 	r.Post("/auth/me", handler.HandleMe)
+	s := server.NewServer(cfg.Port)
+	s.MountEndpoints()
 
-	fmt.Println("kfault server on port", port)
+	if err := s.Start(); err != nil {
+		log.Println(err)
+	}
 
-	http.ListenAndServe(":"+port, r)
 }
