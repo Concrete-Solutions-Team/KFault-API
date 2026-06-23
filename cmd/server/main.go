@@ -32,6 +32,8 @@ func main() {
 	r.Get("/ws", handler.HandleWS)
 
 	r.Post("/auth/register", handler.HandleRegister)
+	r.Post("/auth/login", handler.HandleLogin)
+	r.Post("/auth/me", handler.HandleMe)
 
 	fmt.Println("kfault server on port", port)
 
