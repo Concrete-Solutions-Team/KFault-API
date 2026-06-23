@@ -50,6 +50,38 @@ func (r *Repository) CreateUser(ctx context.Context, user *User) (uuid.UUID, err
 
 	return id, nil
 }
+func (r *Repository) ExpireToken(ctx context.Context, token string, claims CustomClaims) error {
+	sql :=
+		"INSERT INTO expired_tokens (token, expires_at) VALUES ($1, $2)"
+
+	_, err := r.db.Exec(ctx, sql, token, claims.ExpiresAt.Time)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrAlreadyExists
+		}
+		return fmt.Errorf("Internal server error: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) IsTokenRevoked(ctx context.Context, tokenString string) bool {
+	sql :=
+		"SELECT token FROM expired_tokens WHERE token = $1"
+
+	var token string
+	err := r.db.QueryRow(ctx, sql, tokenString).Scan(&token)
+
+	if err != nil {
+		return false
+	}
+	if token != "" {
+		return true
+	}
+
+	return false
+}
 
 func (r *Repository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	var userID uuid.UUID
@@ -67,7 +99,7 @@ func (r *Repository) GetByUsername(ctx context.Context, username string) (*User,
 
 	return &User{
 		ID:           userID,
-		Username: username,
+		Username:     username,
 		PasswordHash: []byte(passHash),
 	}, nil
 }

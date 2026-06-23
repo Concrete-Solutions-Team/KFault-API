@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type Message struct {
@@ -46,6 +47,15 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Expires:  time.Now().Add(24 * time.Hour),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+	})
 	w.WriteHeader(http.StatusOK)
 	data := RegisterResponse{
 		Username: req.Username,
@@ -83,6 +93,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("internal server error: %v", err), http.StatusUnauthorized)
 		return
 	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Expires:  time.Now().Add(24 * time.Hour),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+	})
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(LoginResponse{Username: req.Username, Token: token})
 }
@@ -94,30 +113,38 @@ type ProfileResponse struct {
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
-	val := r.Context().Value(UserContextKey)
-	if val == nil {
-		fmt.Println("Context value is nil!")
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	claims, ok := val.(*CustomClaims)
-	if !ok {
-		fmt.Printf("Context value is of wrong type: %T\n", val)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	authHeader := r.Header.Get("Authorization")
-	tokenString := ""
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		tokenString = authHeader[7:]
-	}
+	claims := r.Context().Value(UserContextKey).(*CustomClaims)
+	tokenString := r.Context().Value(TokenContextKey).(string)
 
 	profile := ProfileResponse{
 		Username: claims.Username,
 		UserID:   claims.UserID,
 		Token:    tokenString,
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(profile)
+}
+
+func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tokenString := ctx.Value(TokenContextKey).(string)
+
+	h.service.LogOut(ctx, tokenString)
+	// h.service.repo.ExpireToken(r.Context(), tokenString, *claims)
+	profile := ProfileResponse{
+		Token:    tokenString,
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Expires:  time.Now().Add(24 * time.Hour),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

@@ -3,12 +3,11 @@ package auth
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
-
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"os"
+	"time"
 )
 
 type Service struct {
@@ -78,4 +77,15 @@ func (s *Service) Login(ctx context.Context, u *UserReq) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func (s *Service) LogOut(ctx context.Context, tokenString string) error {
+	claims := ctx.Value(UserContextKey).(*CustomClaims)
+
+	err := s.repo.ExpireToken(ctx, tokenString, *claims)
+	if err != nil {
+		return fmt.Errorf("failed to save expired token: %w", err)
+	}
+
+	return nil
 }
