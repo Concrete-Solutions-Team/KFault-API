@@ -12,6 +12,9 @@ func main() {
 
 	// pool := db.InitPostgres(cfg.DatabaseURL)
 
+	r.Post("/auth/register", handler.HandleRegister)
+	r.Post("/auth/login", handler.HandleLogin)
+	r.Post("/auth/me", handler.HandleMe)
 	s := server.NewServer(cfg.Port)
 	s.MountEndpoints()
 
