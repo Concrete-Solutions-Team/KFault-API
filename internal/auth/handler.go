@@ -45,7 +45,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	token, err := h.service.Register(ctx, &UserReq{Username: req.Username, Password: req.Password})
 	if err != nil {
 		log.Printf("register failed: %v", err)
-		http.Error(w, "Registration failed", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Registration failed: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	h.service.LogOut(ctx, authInfo.Token)
+	h.service.LogOut(ctx, authInfo)
 	profile := ProfileResponse{
 		Token: authInfo.Token,
 	}

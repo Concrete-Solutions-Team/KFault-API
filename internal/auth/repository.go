@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -50,11 +51,11 @@ func (r *Repository) CreateUser(ctx context.Context, user *User) (uuid.UUID, err
 
 	return id, nil
 }
-func (r *Repository) ExpireToken(ctx context.Context, token string, claims CustomClaims) error {
+func (r *Repository) ExpireToken(ctx context.Context, token string, expiresAt *time.Time) error {
 	sql :=
 		"INSERT INTO expired_tokens (token, expires_at) VALUES ($1, $2)"
 
-	_, err := r.db.Exec(ctx, sql, token, claims.ExpiresAt.Time)
+	_, err := r.db.Exec(ctx, sql, token, *expiresAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
