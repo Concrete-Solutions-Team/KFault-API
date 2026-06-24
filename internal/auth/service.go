@@ -79,10 +79,8 @@ func (s *Service) Login(ctx context.Context, u *UserReq) (string, error) {
 	return tokenString, nil
 }
 
-func (s *Service) LogOut(ctx context.Context, tokenString string) error {
-	claims := ctx.Value(UserContextKey).(*CustomClaims)
-
-	err := s.repo.ExpireToken(ctx, tokenString, *claims)
+func (s *Service) LogOut(ctx context.Context, authInfo *AuthInfo) error {
+	err := s.repo.ExpireToken(ctx, authInfo.Token, &authInfo.Claims.ExpiresAt.Time)
 	if err != nil {
 		return fmt.Errorf("failed to save expired token: %w", err)
 	}

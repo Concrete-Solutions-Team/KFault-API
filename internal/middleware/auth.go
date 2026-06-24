@@ -47,7 +47,7 @@ func AuthMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 				return
 			}
 
-			authData := auth.AuthInfo{
+			authData := &auth.AuthInfo{
 				Claims: *claims,
 				Token:  cookie.Value,
 			}
