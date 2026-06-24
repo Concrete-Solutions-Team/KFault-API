@@ -47,9 +47,12 @@ func AuthMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), auth.UserContextKey, claims)
-			ctx = context.WithValue(ctx, auth.TokenContextKey, cookie.Value)
+			authData := auth.AuthInfo{
+				Claims: *claims,
+				Token:  cookie.Value,
+			}
 
+			ctx := context.WithValue(r.Context(), auth.AuthContextKey, authData)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

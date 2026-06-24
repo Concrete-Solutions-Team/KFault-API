@@ -3,8 +3,11 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
+
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/helpers"
 )
 
 type Message struct {
@@ -13,13 +16,13 @@ type Message struct {
 	Where string
 }
 
-type RegisterRequest struct {
+type AuthRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
-type RegisterResponse struct {
+type AuthResponse struct {
 	Username string `json:"username"`
-	Token    string `json:"token"`
+	Message  string `json:"message"`
 }
 
 type Handler struct {
@@ -31,10 +34,8 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	ctx := r.Context()
-	var req RegisterRequest
+	var req AuthRequest
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -43,67 +44,42 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	token, err := h.service.Register(ctx, &UserReq{Username: req.Username, Password: req.Password})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Register failed: %v", err), http.StatusBadRequest)
+		log.Printf("register failed: %v", err)
+		http.Error(w, "Registration failed", http.StatusBadRequest)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    token,
-		Expires:  time.Now().Add(24 * time.Hour),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-	})
-	w.WriteHeader(http.StatusOK)
-	data := RegisterResponse{
+	SetAuthCookie(w, token)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err = json.NewEncoder(w).Encode(&AuthResponse{
 		Username: req.Username,
-		Token:    token,
-	}
-	if err = json.NewEncoder(w).Encode(data); err != nil {
+		Message:  "Registration successful",
+	}); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to encode JSON: %v", err), http.StatusBadRequest)
 		return
 	}
 }
 
-type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-type LoginResponse struct {
-	Username string `json:"username"`
-	Token    string `json:"token"`
-}
-
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	ctx := r.Context()
-
-	var req LoginRequest
-
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to decode JSON: %v", err), http.StatusBadRequest)
+	var req AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	token, err := h.service.Login(ctx, &UserReq{Username: req.Username, Password: req.Password})
+
+	token, err := h.service.Login(r.Context(), &UserReq{Username: req.Username, Password: req.Password})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("internal server error: %v", err), http.StatusUnauthorized)
+		log.Printf("Login failed for user %s: %v", req.Username, err)
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    token,
-		Expires:  time.Now().Add(24 * time.Hour),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
+	SetAuthCookie(w, token)
+
+	helpers.SendJSON(w, http.StatusOK, &AuthResponse{
+		Username: req.Username,
+		Message:  "Login successful",
 	})
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(LoginResponse{Username: req.Username, Token: token})
 }
 
 type ProfileResponse struct {
@@ -113,29 +89,35 @@ type ProfileResponse struct {
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
-	claims := r.Context().Value(UserContextKey).(*CustomClaims)
-	tokenString := r.Context().Value(TokenContextKey).(string)
-
-	profile := ProfileResponse{
-		Username: claims.Username,
-		UserID:   claims.UserID,
-		Token:    tokenString,
+	authInfo, err := GetAuthInfo(r)
+	if err != nil || authInfo == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(profile)
+	profile := ProfileResponse{
+		Username: authInfo.Claims.Username,
+		UserID:   authInfo.Claims.UserID,
+		Token:    authInfo.Token,
+	}
+
+	helpers.SendJSON(w, http.StatusOK, profile)
 }
 
 func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	tokenString := ctx.Value(TokenContextKey).(string)
-
-	h.service.LogOut(ctx, tokenString)
-	// h.service.repo.ExpireToken(r.Context(), tokenString, *claims)
-	profile := ProfileResponse{
-		Token:    tokenString,
+	authInfo, err := GetAuthInfo(r)
+	if err != nil || authInfo == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
+
+	ctx := r.Context()
+
+	h.service.LogOut(ctx, authInfo.Token)
+	profile := ProfileResponse{
+		Token: authInfo.Token,
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
@@ -146,7 +128,5 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(profile)
+	helpers.SendJSON(w, http.StatusOK, profile)
 }
