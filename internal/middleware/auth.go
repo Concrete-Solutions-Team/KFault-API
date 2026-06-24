@@ -5,42 +5,55 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/auth"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Authorization header missing", http.StatusUnauthorized)
-			return
-		}
+// TODO: refactor + utils
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "Invalid token format. Use 'Bearer <token>'", http.StatusUnauthorized)
-			return
-		}
-		tokenString := parts[1]
+// internal/middleware/auth.go
 
-		claims := &auth.CustomClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+func AuthMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie("auth_token")
+			if err != nil {
+				if err == http.ErrNoCookie {
+					http.Error(w, "Cookie not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, "Server error", http.StatusInternalServerError)
+				return
 			}
-			return []byte(os.Getenv("JWT_SECRET")), nil
+
+			claims := &auth.CustomClaims{}
+			token, err := jwt.ParseWithClaims(cookie.Value, claims, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return []byte(os.Getenv("JWT_SECRET")), nil
+			})
+
+			if err != nil || token == nil || !token.Valid {
+				http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+				return
+			}
+
+			isRevoked := repo.IsTokenRevoked(r.Context(), cookie.Value)
+			fmt.Println(isRevoked)
+			if isRevoked {
+				http.Error(w, "Token expired", http.StatusUnauthorized)
+				return
+			}
+
+			authData := auth.AuthInfo{
+				Claims: *claims,
+				Token:  cookie.Value,
+			}
+
+			ctx := context.WithValue(r.Context(), auth.AuthContextKey, authData)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
-
-		if err != nil || !token.Valid {
-			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), auth.UserContextKey, claims)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}
 }
