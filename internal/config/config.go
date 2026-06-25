@@ -10,6 +10,7 @@ type Config struct {
 	DatabaseURL        string
 	JWTServer          string
 	Port               string
+	FrontendURL        string
 	CloudflareAPIToken string
 	S3AccountID        string
 	S3AccessKeyID      string
@@ -24,6 +25,7 @@ func LoadConfig() *Config {
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		JWTServer:          os.Getenv("JWT_SECRET"),
 		Port:               os.Getenv("PORT"),
+		FrontendURL:        os.Getenv("FRONTEND_URL"),
 		CloudflareAPIToken: os.Getenv("CLOUDFLARE_API_TOKEN"),
 		S3AccountID:        os.Getenv("S3_ACCOUNT_ID"),
 		S3AccessKeyID:      os.Getenv("S3_ACCESS_KEY_ID"),

@@ -67,7 +67,7 @@ func main() {
 	authService := auth.NewService(authRepository)
 	authHandler := auth.NewHandler(authService)
 
-	s := server.NewServer(cfg.Port)
+	s := server.NewServer(cfg.Port, cfg.FrontendURL)
 	s.MountEndpoints(authRepository, authHandler, strHandler)
 
 	if err := s.Start(); err != nil {
