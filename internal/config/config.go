@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -22,7 +23,7 @@ func LoadConfig() *Config {
 	godotenv.Load()
 
 	cfg := &Config{
-		DatabaseURL:        os.Getenv("DATABASE_URL"),
+		DatabaseURL:        getDatabaseURL(),
 		JWTServer:          os.Getenv("JWT_SECRET"),
 		Port:               os.Getenv("PORT"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
@@ -34,4 +35,15 @@ func LoadConfig() *Config {
 	}
 
 	return cfg
+}
+
+func getDatabaseURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_SSLMODE"),
+	)
 }
