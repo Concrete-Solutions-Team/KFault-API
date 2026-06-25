@@ -29,8 +29,13 @@ func (h *Handler) setAuthCookie(w http.ResponseWriter, token string) {
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
+<<<<<<< HEAD
 		Secure:   isSecure,
 		SameSite: sameSite,
+=======
+		Secure:   true,
+		SameSite: "none",
+>>>>>>> 313824d (Update utils.go (#9))
 		Path:     "/",
 	})
 }
