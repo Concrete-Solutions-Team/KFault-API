@@ -22,7 +22,7 @@ func SetAuthCookie(w http.ResponseWriter, token string) {
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: "none",
+		SameSite: http.SameSiteNoneMode,
 		Path:     "/",
 	})
 }
