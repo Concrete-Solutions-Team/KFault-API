@@ -20,7 +20,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(port string) *Server {
+func NewServer(port, frontendURL string) *Server {
 	s := &Server{
 		router: chi.NewRouter(),
 	}
@@ -39,7 +39,7 @@ func NewServer(port string) *Server {
 
 	// enable CORS
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedOrigins:   []string{frontendURL},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
