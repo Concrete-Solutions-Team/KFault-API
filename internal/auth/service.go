@@ -3,11 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	"os"
-	"time"
 )
 
 type Service struct {
@@ -23,7 +24,6 @@ func NewService(r *Repository) *Service {
 func (s *Service) Register(ctx context.Context, u *UserReq) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
-
 		return "", fmt.Errorf("Bcrypt failed: %v", err)
 	}
 

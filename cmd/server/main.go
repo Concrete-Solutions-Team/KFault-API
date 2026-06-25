@@ -9,6 +9,8 @@ import (
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/auth"
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/config"
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/db"
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/messages"
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/rooms"
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/server"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -48,6 +50,8 @@ func main() {
 	cfg := config.LoadConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 
+
+
 	pool := db.InitPostgres(cfg.DatabaseURL)
 	StartCleanup(ctx, pool)
 
@@ -58,8 +62,17 @@ func main() {
 	authService := auth.NewService(authRepository)
 	authHandler := auth.NewHandler(authService)
 
+	wsRepository := messages.NewRepository(pool)
+
+	roomsRepository := rooms.NewRepository(pool)
+	roomsService := rooms.NewService(roomsRepository)
+	roomsHandler := rooms.NewHandler(roomsService)
+
+	hub := messages.NewHub(wsRepository)
 	s := server.NewServer(cfg.Port)
-	s.MountEndpoints(authRepository, authHandler)
+	s.MountEndpoints(authRepository, authHandler, hub, wsRepository, roomsHandler)
+
+	go hub.Run()
 
 	if err := s.Start(); err != nil {
 		log.Println(err)
