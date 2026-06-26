@@ -3,10 +3,11 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
-func GetAuthInfo(r *http.Request) (*AuthInfo, error) {
+func (h *Handler) getAuthInfo(r *http.Request) (*AuthInfo, error) {
 	val := r.Context().Value(AuthContextKey)
 	if val == nil {
 		return nil, fmt.Errorf("no auth info in context")
@@ -15,14 +16,21 @@ func GetAuthInfo(r *http.Request) (*AuthInfo, error) {
 	return val.(*AuthInfo), nil
 }
 
-func SetAuthCookie(w http.ResponseWriter, token string) {
+func (h *Handler) setAuthCookie(w http.ResponseWriter, token string) {
+	sameSite := http.SameSiteLaxMode
+	// check for secure http
+	isSecure := strings.HasPrefix(h.frontendURL, "https://")
+	if isSecure {
+		sameSite = http.SameSiteNoneMode
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
+		Secure:   isSecure,
+		SameSite: sameSite,
 		Path:     "/",
 	})
 }

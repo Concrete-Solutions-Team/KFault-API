@@ -65,7 +65,7 @@ func main() {
 
 	authRepository := auth.NewRepository(pool)
 	authService := auth.NewService(authRepository)
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, cfg.FrontendURL)
 
 	s := server.NewServer(cfg.Port, cfg.FrontendURL)
 	s.MountEndpoints(authRepository, authHandler, strHandler)
