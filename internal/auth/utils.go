@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (h *Handler) getAuthInfo(r *http.Request) (*AuthInfo, error) {
+func GetAuthInfo(r *http.Request) (*AuthInfo, error) {
 	val := r.Context().Value(AuthContextKey)
 	if val == nil {
 		return nil, fmt.Errorf("no auth info in context")
