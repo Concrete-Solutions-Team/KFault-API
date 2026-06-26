@@ -2,6 +2,7 @@ package messages
 
 import (
 	"context"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,11 +24,15 @@ type MessageData struct {
 }
 
 func (r *Repository) InsertMessage(ctx context.Context, msg MessageData) error {
-	sql := "INSERT INTO messages (room_id, user_id, content) VALUES ($1, $2, $3)"
+	log.Println(msg.UserID)
+	log.Println(msg.RoomID)
+	sql := "INSERT INTO messages (room_id, user_id, content) VALUES ($1, $2, $3) RETURNING content::text"
 
-	_, err := r.db.Query(ctx, sql, msg.RoomID, msg.UserID, msg.Content)
+	s, err := r.db.Exec(ctx, sql, msg.RoomID, msg.UserID, msg.Content)
 	if err != nil {
+		log.Println("insert err", err)
 		return err
 	}
+	log.Println(s)
 	return nil
 }

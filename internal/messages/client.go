@@ -10,7 +10,10 @@ import (
 // client -> hub
 func (c *Client) ReadPump() {
 	defer func() {
-		c.Hub.Unregister <- c
+		c.Hub.Unregister <- &Sub{
+			Client: c,
+			RoomID: c.RoomID,
+		}
 		c.Conn.Close()
 	}()
 

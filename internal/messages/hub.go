@@ -15,9 +15,9 @@ import (
 type Hub struct {
 	Clients    map[*Client]bool
 	Rooms      map[string]map[*Client]bool
-	Broadcast  chan RoomMessage
+	Broadcast  chan Message
 	Register   chan *Sub
-	Unregister chan *Client
+	Unregister chan *Sub
 	Repo       *Repository
 }
 
@@ -36,10 +36,10 @@ var Upgrader = websocket.Upgrader{
 
 func NewHub(repo *Repository) *Hub {
 	return &Hub{
-		Clients:     make(map[*Client]bool),
-		Broadcast:  make(chan RoomMessage, 1024),
+		Clients:    make(map[*Client]bool),
+		Broadcast:  make(chan Message, 1024),
 		Register:   make(chan *Sub, 256),
-		Unregister: make(chan *Client, 256),
+		Unregister: make(chan *Sub, 256),
 		Rooms:      make(map[string]map[*Client]bool),
 		Repo:       repo,
 	}
@@ -116,49 +116,59 @@ func (h *Hub) Run() {
 			})
 			client.Send <- succmsg
 
-		case client := <-h.Unregister:
-			if clients, ok := h.Rooms[client.RoomID]; ok {
-				if _, ok := clients[client]; ok {
-					delete(clients, client)
-					close(client.Send)
+		case sub := <-h.Unregister:
+			client := sub.Client
+			room := sub.RoomID
+			if _, exists := h.Clients[client]; exists {
+				delete(h.Clients, client)
+				log.Printf("Cleaned client from global registry.")
+			}
+			if room != "" {
+				if clients, ok := h.Rooms[room]; ok {
+					if _, ok := clients[client]; ok {
+						delete(clients, client)
+						log.Printf("Removed client from room: %s", room)
+					}
+
 					if len(clients) == 0 {
-						delete(h.Rooms, client.RoomID)
+						delete(h.Rooms, room)
+						log.Printf("Room %s is completely empty. Room deleted.", room)
 					}
 				}
 			}
+			if client.Conn != nil {
+				client.Conn.Close()
+				log.Println("Closed raw WebSocket connection network pipe safely.")
+			}
 
 		case message := <-h.Broadcast:
-			go func(roomID string, payload []byte) {
-				var unm ChatPayload
-				err := json.Unmarshal(payload, &unm)
-				if err != nil {
-					return
-				}
+			var unm ChatPayload
+			err := json.Unmarshal(message.Payload, &unm)
+			if err != nil {
+				continue
+			}
+			go func(roomID string) {
+
 				ctx := context.Background()
+				log.Println("async run")
 				if err = h.Repo.InsertMessage(ctx, MessageData{RoomID: roomID, Content: unm.Text, UserID: unm.Sender}); err != nil {
 					log.Printf("Error saving message to DB for room %s: %v", roomID, err)
 				}
-			}(message.RoomID, message.Payload)
-			log.Printf("broadcasting to room %s, clients: %d", message.RoomID, len(h.Rooms[message.RoomID]))
-			if clients, ok := h.Rooms[message.RoomID]; ok {
+			}(unm.RoomID)
+			log.Printf("broadcasting to room %s, clients: %d", unm.RoomID, len(h.Rooms[unm.RoomID]))
+			if clients, ok := h.Rooms[unm.RoomID]; ok {
 				for client := range clients {
 					select {
-					case client.Send <- message.Payload:
+					case client.Send <- mustMarshal(Message{
+						Type:    TypeChat,
+						Payload: mustMarshal(unm),
+					}):
 					default:
 						close(client.Send)
 						delete(clients, client)
 					}
 				}
-
 			}
-			// for client := range h.Rooms[message.RoomID] {
-			// 	select {
-			// 	case client.Send <- mustMarshal(message):
-			// 	default:
-			// 		close(client.Send)
-			// 		delete(h.Rooms[message.RoomID], client)
-			// 	}
-			// }
 		}
 	}
 }

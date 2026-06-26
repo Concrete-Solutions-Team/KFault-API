@@ -28,10 +28,15 @@ func (h *Hub) Handle(msg Message, sender *Client) {
 		}
 		log.Printf("chat room_id: [%s]", payload.RoomID)
 		fmt.Println(payload)
+		msg2 := mustMarshal(ChatPayload{
+			Text: payload.Text,
+			Sender: sender.Auth.Claims.UserID,
+			RoomID: payload.RoomID,
+		})
 		// msg.RoomID = msg.RoomID
-		h.Broadcast <- RoomMessage{
-			RoomID:  payload.RoomID,
-			Payload: mustMarshal(msg),
+		h.Broadcast <- Message{
+			Type: TypeChat,
+			Payload: msg2,
 		}
 	case TypeJoin:
 		var payload RegPayload
@@ -39,13 +44,23 @@ func (h *Hub) Handle(msg Message, sender *Client) {
 			log.Println("bad reg payload", err)
 			return
 		}
-		log.Printf("joim room_id: [%s]", payload.RoomID)
+		log.Printf("join room_id: [%s]", payload.RoomID)
 
 		h.Register <- &Sub{
 			Client: sender,
 			RoomID: payload.RoomID,
 		}
-
+	case TypeLeave:
+		var payload RegPayload
+		if err :=json.Unmarshal(msg.Payload, &payload); err != nil {
+			log.Println("bad reg payload", err)
+			return
+		}
+		log.Printf("leaving room_id: [%s]", payload.RoomID)
+		h.Unregister <- &Sub{
+			Client: sender,
+			RoomID: payload.RoomID,
+		}
 	default:
 		log.Println("unknown message type:", msg.Type)
 
