@@ -44,25 +44,6 @@ func (h *Handler) clearAuthCookie(w http.ResponseWriter) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-		Secure:   isSecure,
-		SameSite: sameSite,
-	})
-}
-
-func (h *Handler) clearAuthCookie(w http.ResponseWriter) {
-	sameSite := http.SameSiteLaxMode
-	// check for secure http
-	isSecure := strings.HasPrefix(h.frontendURL, "https://")
-	if isSecure {
-		sameSite = http.SameSiteNoneMode
-	}
-
-	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
