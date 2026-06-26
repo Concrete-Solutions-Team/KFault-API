@@ -38,12 +38,12 @@ func LoadConfig() *Config {
 }
 
 func getDatabaseURL() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&channel_binding=%s",
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
 		os.Getenv("DB_NAME"),
 		os.Getenv("DB_SSLMODE"),
+		os.Getenv("DB_CHANNEL_BINDING"),
 	)
 }
