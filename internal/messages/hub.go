@@ -51,9 +51,7 @@ func (h *Hub) Run() {
 		case sub := <-h.Register:
 			client := sub.Client
 			newRoom := sub.RoomID
-
-			log.Println("Client data:", sub.Client)
-
+			
 			if newRoom == "" {
 				if _, ok := h.Clients[client]; ok {
 					log.Printf("Client already connected")
