@@ -31,20 +31,10 @@ type Handler struct {
 }
 
 func NewHandler(service *Service, frontendURL string) *Handler {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 497cbec (fix: cookies 101%)
 	return &Handler{
 		service:     service,
 		frontendURL: frontendURL,
 	}
-<<<<<<< HEAD
-=======
-	return &Handler{service: service}
->>>>>>> 1d0ef36 (fix: proper cookie set in safari)
-=======
->>>>>>> 497cbec (fix: cookies 101%)
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -132,16 +122,7 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 		Token: authInfo.Token,
 	}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	h.clearAuthCookie(w)
-=======
-	// set cookie to none
-	h.setAuthCookie(w, "")
->>>>>>> 1d0ef36 (fix: proper cookie set in safari)
-=======
-	h.clearAuthCookie(w)
->>>>>>> 2524ea1 (fix: clear cookie correctly)
 
 	helpers.SendJSON(w, http.StatusOK, profile)
 }
