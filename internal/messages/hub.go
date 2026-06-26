@@ -11,11 +11,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// hub is the boss
 type Hub struct {
-	// Clients    map[*Client]bool
+	Clients    map[*Client]bool
 	Rooms      map[string]map[*Client]bool
 	Broadcast  chan RoomMessage
-	Register   chan *Client
+	Register   chan *Sub
 	Unregister chan *Client
 	Repo       *Repository
 }
@@ -33,12 +34,12 @@ var Upgrader = websocket.Upgrader{
 	},
 }
 
-// todo: rooms implementation
 func NewHub(repo *Repository) *Hub {
 	return &Hub{
-		Broadcast:  make(chan RoomMessage),
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
+		Clients:     make(map[*Client]bool),
+		Broadcast:  make(chan RoomMessage, 1024),
+		Register:   make(chan *Sub, 256),
+		Unregister: make(chan *Client, 256),
 		Rooms:      make(map[string]map[*Client]bool),
 		Repo:       repo,
 	}
@@ -47,13 +48,74 @@ func NewHub(repo *Repository) *Hub {
 func (h *Hub) Run() {
 	for {
 		select {
-		case client := <-h.Register:
-			if _, ok := h.Rooms[client.RoomID]; !ok {
-				h.Rooms[client.RoomID] = make(map[*Client]bool)
+		case sub := <-h.Register:
+			client := sub.Client
+			newRoom := sub.RoomID
+
+			log.Println("Client data:", sub.Client)
+
+			if newRoom == "" {
+				if _, ok := h.Clients[client]; ok {
+					log.Printf("Client already connected")
+					succmsg := mustMarshal(Message{
+						Type: TypeSystem,
+						Payload: mustMarshal(SystemPayload{
+							Message: "Client already connected",
+							RoomID:  newRoom,
+						}),
+					})
+					client.Send <- succmsg
+				}
+
+				h.Clients[client] = true
+				log.Printf("Client connected first-time")
+				succmsg := mustMarshal(Message{
+					Type: TypeSystem,
+					Payload: mustMarshal(SystemPayload{
+						Message: "Client connected",
+						RoomID:  newRoom,
+					}),
+				})
+				client.Send <- succmsg
+				continue
 			}
-			log.Printf("registered client in room: %s, total: %d", client.RoomID, len(h.Rooms[client.RoomID]))
-			h.Rooms[client.RoomID][client] = true
-			log.Printf("Client joined room: %s", client.RoomID)
+
+			if client.RoomID == newRoom {
+				log.Println("Already in this room, folks. No need to join again.")
+				sysmsg := mustMarshal(SystemPayload{
+					Message: "client already in the room",
+					RoomID:  newRoom,
+				})
+				client.Send <- mustMarshal(Message{Type: TypeSystem, Payload: sysmsg})
+				continue
+			}
+
+			if client.RoomID != "" {
+				if oldRoomClients, ok := h.Rooms[client.RoomID]; ok {
+					delete(oldRoomClients, client)
+					log.Printf("Removed client from old room: %s", client.RoomID)
+
+					if len(oldRoomClients) == 0 {
+						delete(h.Rooms, client.RoomID)
+					}
+				}
+			}
+			if _, ok := h.Rooms[newRoom]; !ok {
+				h.Rooms[newRoom] = make(map[*Client]bool)
+			}
+			h.Rooms[newRoom][client] = true
+
+			client.RoomID = newRoom
+			log.Printf("Client successfully joined new room: %s", newRoom)
+			succmsg := mustMarshal(Message{
+				Type: TypeSystem,
+				Payload: mustMarshal(SystemPayload{
+					Message: "Succesfully joined a room",
+					RoomID:  newRoom,
+				}),
+			})
+			client.Send <- succmsg
+
 		case client := <-h.Unregister:
 			if clients, ok := h.Rooms[client.RoomID]; ok {
 				if _, ok := clients[client]; ok {
@@ -119,7 +181,10 @@ func ServeWS(hub *Hub, db *Repository, w http.ResponseWriter, r *http.Request) {
 		Auth: info,
 	}
 	fmt.Println(info.Claims.UserID)
-	client.Hub.Register <- client
+	client.Hub.Register <- &Sub{
+		Client: client,
+		RoomID: "",
+	}
 
 	go client.WritePump()
 	go client.ReadPump()

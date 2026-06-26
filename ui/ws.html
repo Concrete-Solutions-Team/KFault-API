@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KFault — WebSocket Panel</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+<style>
+  :root {
+    --bg:#0f0f11;--surface-0:#141418;--surface-1:#1c1c22;--surface-2:#242430;
+    --border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.14);
+    --text-primary:#e8e8f0;--text-secondary:#9898b0;--text-muted:#58587a;
+    --violet:#7c6af7;--violet-bg:rgba(124,106,247,0.12);--violet-border:rgba(124,106,247,0.3);
+    --green:#3de89a;--green-bg:rgba(61,232,154,0.1);--green-border:rgba(61,232,154,0.25);
+    --red:#f76a6a;--red-bg:rgba(247,106,106,0.1);--red-border:rgba(247,106,106,0.25);
+    --amber:#f7be6a;--amber-bg:rgba(247,190,106,0.1);--amber-border:rgba(247,190,106,0.3);
+    --radius:8px;
+    --mono:'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--mono);background:var(--bg);color:var(--text-primary);min-height:100vh;font-size:13px;line-height:1.5;}
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--surface-2);border-radius:3px;}
+  .shell{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+  /* topbar */
+  .topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface-0);flex-shrink:0;flex-wrap:wrap;}
+  .logo{font-size:14px;font-weight:700;color:var(--violet);letter-spacing:-0.02em;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+  .logo span{color:var(--text-muted);font-weight:400;font-size:12px;}
+  .conn-row{display:flex;gap:6px;flex:1;min-width:260px;align-items:center;}
+  .cookie-label{font-size:11px;color:var(--text-muted);white-space:nowrap;display:flex;align-items:center;gap:5px;}
+
+  /* inputs */
+  input.fi{font-family:var(--mono);font-size:12px;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:var(--radius);color:var(--text-primary);padding:6px 10px;outline:none;transition:border-color .15s,opacity .15s;}
+  input.fi:focus{border-color:var(--violet);}
+  input.fi:disabled{opacity:.35;cursor:not-allowed;}
+  select{font-family:var(--mono);font-size:12px;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:var(--radius);color:var(--text-primary);padding:6px 10px;outline:none;cursor:pointer;transition:opacity .15s;}
+  select:focus{border-color:var(--violet);}
+  select:disabled{opacity:.35;cursor:not-allowed;}
+  textarea{font-family:var(--mono);font-size:12px;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:var(--radius);color:var(--text-primary);padding:8px 10px;outline:none;resize:vertical;min-height:72px;width:100%;transition:opacity .15s;}
+  textarea:focus{border-color:var(--violet);}
+  textarea:disabled{opacity:.35;cursor:not-allowed;}
+
+  /* buttons */
+  .btn{font-family:var(--mono);font-size:12px;padding:6px 14px;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:background .12s,opacity .12s;}
+  .btn:hover{background:var(--surface-2);}
+  .btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
+  .btn.primary{background:var(--violet);border-color:var(--violet);color:#fff;}
+  .btn.primary:hover{background:#6a58e0;}
+  .btn.danger{background:var(--red-bg);border-color:var(--red-border);color:var(--red);}
+  .btn.danger:hover{background:rgba(247,106,106,.18);}
+  .btn.sm{padding:4px 10px;font-size:11px;}
+
+  /* status */
+  .pill{font-size:11px;font-weight:600;letter-spacing:.04em;padding:2px 9px;border-radius:999px;white-space:nowrap;}
+  .pill.connected{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+  .pill.disconnected{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
+  .pill.connecting{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);}
+
+  /* body split */
+  .body{display:flex;flex:1;overflow:hidden;}
+
+  /* sidebar */
+  .sidebar{width:230px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface-0);display:flex;flex-direction:column;overflow:hidden;}
+  .sidebar-section{padding:12px;border-bottom:1px solid var(--border);}
+  .section-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+  .room-input-row{display:flex;gap:5px;}
+  .room-input-row input{flex:1;font-family:var(--mono);font-size:12px;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:var(--radius);color:var(--text-primary);padding:5px 8px;outline:none;transition:border-color .15s,opacity .15s;}
+  .room-input-row input:focus{border-color:var(--violet);}
+  .room-input-row input:disabled{opacity:.35;cursor:not-allowed;}
+
+  .connect-hint{margin:8px;padding:8px 10px;border-radius:var(--radius);background:var(--amber-bg);border:1px solid var(--amber-border);color:var(--amber);font-size:11px;display:flex;align-items:center;gap:6px;}
+  .connect-hint.hidden{display:none;}
+
+  .rooms-scroll{flex:1;overflow-y:auto;padding:6px;}
+  .room-item{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:var(--radius);cursor:pointer;border:1px solid transparent;transition:background .1s;margin-bottom:2px;}
+  .room-item:hover{background:var(--surface-1);}
+  .room-item.active{background:var(--violet-bg);border-color:var(--violet-border);}
+  .room-item .hash{color:var(--text-muted);font-size:13px;flex-shrink:0;}
+  .room-item.active .hash{color:var(--violet);}
+  .room-name{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .room-item.active .room-name{color:var(--violet);}
+  .client-badge{font-size:10px;background:var(--surface-2);color:var(--text-muted);padding:1px 6px;border-radius:999px;border:1px solid var(--border);flex-shrink:0;}
+  .room-item.active .client-badge{background:var(--violet);color:#fff;border-color:transparent;}
+  .empty-rooms{text-align:center;padding:24px 12px;color:var(--text-muted);font-size:12px;}
+  .empty-rooms i{display:block;font-size:22px;margin-bottom:6px;}
+
+  /* main */
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* stats */
+  .stats-bar{display:flex;gap:1px;border-bottom:1px solid var(--border);background:var(--border);flex-shrink:0;}
+  .stat{flex:1;background:var(--surface-0);padding:10px 14px;}
+  .stat-val{font-size:20px;font-weight:700;color:var(--text-primary);}
+  .stat-val.violet{color:var(--violet);}
+  .stat-val.green{color:var(--green);}
+  .stat-label{font-size:10px;color:var(--text-muted);margin-top:1px;letter-spacing:.06em;text-transform:uppercase;}
+
+  /* tabs */
+  .tabs-bar{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--border);background:var(--surface-0);flex-shrink:0;}
+  .tab-btn{font-family:var(--mono);font-size:12px;padding:5px 13px;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:var(--radius) var(--radius) 0 0;transition:color .1s;}
+  .tab-btn:hover{color:var(--text-secondary);}
+  .tab-btn.active{color:var(--violet);border-bottom-color:var(--violet);}
+  .tab-panel{display:none;flex:1;overflow:hidden;flex-direction:column;}
+  .tab-panel.active{display:flex;}
+
+  /* send */
+  .send-area{padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;}
+  .field-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .field-label{font-size:11px;color:var(--text-muted);width:70px;flex-shrink:0;}
+  .send-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center;}
+  pre.preview{background:var(--surface-0);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;word-break:break-all;display:none;}
+  pre.preview.visible{display:block;}
+
+  /* log */
+  .log-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+  .log{flex:1;overflow-y:auto;padding:10px;background:var(--surface-0);display:flex;flex-direction:column;gap:3px;}
+  .log-entry{display:flex;gap:8px;font-size:12px;line-height:1.6;align-items:flex-start;}
+  .log-ts{color:var(--text-muted);white-space:nowrap;flex-shrink:0;min-width:90px;}
+  .log-dir{font-weight:700;flex-shrink:0;min-width:30px;}
+  .log-dir.out{color:var(--violet);}
+  .log-dir.in{color:var(--green);}
+  .log-dir.sys{color:var(--text-muted);}
+  .log-dir.err{color:var(--red);}
+  .log-body{color:var(--text-secondary);word-break:break-all;}
+  .log-footer{display:flex;justify-content:flex-end;padding:6px 10px;border-top:1px solid var(--border);background:var(--surface-0);flex-shrink:0;}
+
+  /* raw */
+  .raw-area{padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;}
+
+  /* clients */
+  .clients-area{padding:14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;}
+  .client-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--radius);background:var(--surface-1);border:1px solid var(--border);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
+  .client-id{flex:1;color:var(--text-secondary);font-size:12px;}
+  .client-room-tag{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--violet-bg);color:var(--violet);border:1px solid var(--violet-border);}
+  .client-note{font-size:11px;color:var(--text-muted);}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="logo">
+      <i class="ti ti-plug-connected" aria-hidden="true"></i>
+      KFault <span>ws panel</span>
+    </div>
+    <div class="conn-row">
+      <input class="fi" type="text" id="wsUrl" value="ws://localhost:8080/ws" placeholder="ws://..." style="flex:1;" />
+      <span class="cookie-label">
+        <i class="ti ti-cookie" aria-hidden="true"></i> auth_token
+      </span>
+      <input class="fi" type="text" id="cookieVal" placeholder="paste JWT..." style="flex:1.2;min-width:140px;" />
+    </div>
+    <button class="btn primary" id="connectBtn" onclick="toggleConnect()">
+      <i class="ti ti-plug" aria-hidden="true"></i> Connect
+    </button>
+    <span class="pill disconnected" id="statusPill">disconnected</span>
+  </div>
+
+  <div class="body">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <p class="section-label">Rooms</p>
+        <div class="room-input-row">
+          <input type="text" id="roomInput" placeholder="room_id..." disabled
+            onkeydown="if(event.key==='Enter')joinRoom()" />
+          <button class="btn sm" id="joinBtn" onclick="joinRoom()" disabled>Join</button>
+        </div>
+      </div>
+      <div class="connect-hint" id="connectHint">
+        <i class="ti ti-info-circle" aria-hidden="true"></i> connect first
+      </div>
+      <div class="rooms-scroll" id="roomList">
+        <div class="empty-rooms">
+          <i class="ti ti-topology-star-3" aria-hidden="true"></i>
+          No rooms joined yet
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="stats-bar">
+        <div class="stat"><div class="stat-val violet" id="statRooms">0</div><div class="stat-label">Rooms</div></div>
+        <div class="stat"><div class="stat-val" id="statClients">0</div><div class="stat-label">Clients</div></div>
+        <div class="stat"><div class="stat-val" id="statSent">0</div><div class="stat-label">Sent</div></div>
+        <div class="stat"><div class="stat-val green" id="statRecv">0</div><div class="stat-label">Received</div></div>
+      </div>
+
+      <div class="tabs-bar">
+        <button class="tab-btn active" onclick="switchTab('send',this)">Send</button>
+        <button class="tab-btn" onclick="switchTab('log',this)">Log</button>
+        <button class="tab-btn" onclick="switchTab('raw',this)">Raw frame</button>
+        <button class="tab-btn" onclick="switchTab('clients',this)">Clients</button>
+      </div>
+
+      <!-- send -->
+      <div class="tab-panel active" id="tab-send">
+        <div class="send-area">
+          <div class="field-row">
+            <span class="field-label">Type</span>
+            <select id="msgType" onchange="onTypeChange()" disabled>
+              <option value="chat">chat</option>
+              <option value="join">join</option>
+              <option value="leave">leave</option>
+              <option value="custom">custom</option>
+            </select>
+            <span class="field-label" style="width:auto;margin-left:8px;">Room</span>
+            <select id="targetRoom" style="flex:1;" disabled>
+              <option value="">— none —</option>
+            </select>
+          </div>
+          <div id="textFields">
+            <div class="field-row" style="align-items:flex-start;">
+              <span class="field-label" style="padding-top:6px;">Text</span>
+              <textarea id="chatText" placeholder="Message text..." style="flex:1;" disabled></textarea>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Sender</span>
+              <input class="fi" type="text" id="senderField" style="flex:1;" disabled />
+            </div>
+          </div>
+          <div class="send-actions">
+            <button class="btn sm" id="previewBtn" onclick="previewPayload()" disabled>
+              <i class="ti ti-eye" aria-hidden="true"></i> Preview
+            </button>
+            <button class="btn primary" id="sendBtn" onclick="sendMessage()" disabled>
+              <i class="ti ti-send" aria-hidden="true"></i> Send
+            </button>
+          </div>
+          <pre class="preview" id="jsonPreview"></pre>
+        </div>
+      </div>
+
+      <!-- log -->
+      <div class="tab-panel" id="tab-log">
+        <div class="log-wrap">
+          <div class="log" id="msgLog">
+            <div class="log-entry">
+              <span class="log-ts">--:--:--.---</span>
+              <span class="log-dir sys">SYS</span>
+              <span class="log-body" style="color:var(--text-muted);">Waiting for connection...</span>
+            </div>
+          </div>
+          <div class="log-footer">
+            <button class="btn sm" onclick="clearLog()">
+              <i class="ti ti-trash" aria-hidden="true"></i> Clear
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- raw -->
+      <div class="tab-panel" id="tab-raw">
+        <div class="raw-area">
+          <p class="section-label">Raw JSON frame</p>
+          <textarea id="rawFrame" style="flex:1;min-height:160px;" disabled
+            placeholder='{"type":"chat","payload":{"room_id":"general","text":"hello","sender":"u1"}}'></textarea>
+          <div style="display:flex;gap:6px;justify-content:flex-end;">
+            <button class="btn sm" onclick="formatRaw()">
+              <i class="ti ti-braces" aria-hidden="true"></i> Format
+            </button>
+            <button class="btn primary" id="sendRawBtn" onclick="sendRaw()" disabled>
+              <i class="ti ti-send" aria-hidden="true"></i> Send raw
+            </button>
+          </div>
+          <pre class="preview" id="rawPreview"></pre>
+        </div>
+      </div>
+
+      <!-- clients -->
+      <div class="tab-panel" id="tab-clients">
+        <div class="clients-area" id="clientsGrid">
+          <div style="color:var(--text-muted);font-size:12px;padding:4px 0;">No clients connected.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const clientId = 'client-' + Math.random().toString(36).slice(2, 8);
+let ws = null, rooms = [], activeRoom = null, sentCount = 0, recvCount = 0;
+const clients = {};
+
+document.getElementById('senderField').value = clientId;
+
+function toggleConnect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    ws.close();
+  } else {
+    doConnect();
+  }
+}
+
+function doConnect() {
+  const url = document.getElementById('wsUrl').value.trim();
+  if (!url) return;
+  const token = document.getElementById('cookieVal').value.trim();
+  if (token) {
+    // sets auth_token cookie for the same origin as this page
+    // works when served from the same host:port as the Go server
+    // no-op when opened from file:// (different origin)
+    document.cookie = 'auth_token=' + encodeURIComponent(token) + '; path=/; SameSite=Lax';
+    addLog('sys', 'cookie set: auth_token=' + token.slice(0, 12) + '...');
+  }
+  try {
+    ws = new WebSocket(url);
+    setStatus('connecting');
+    document.getElementById('connectBtn').innerHTML = '<i class="ti ti-loader" aria-hidden="true"></i> Connecting...';
+    document.getElementById('connectBtn').className = 'btn';
+
+    ws.onopen = () => {
+      setStatus('connected');
+      document.getElementById('connectBtn').innerHTML = '<i class="ti ti-plug-x" aria-hidden="true"></i> Disconnect';
+      document.getElementById('connectBtn').className = 'btn danger';
+      addLog('sys', 'Connected to ' + url);
+      setGated(true);
+      upsertClient(clientId, null);
+    };
+ws.onmessage = e => {
+  recvCount++;
+  document.getElementById('statRecv').textContent = recvCount;
+  addLog('in', e.data);
+
+  try {
+    const msg = JSON.parse(e.data);
+
+    // Check if the message contains presence/client data
+    // NOTE: Change "presence" or "clients" to match your Go backend payload keys!
+    if (msg.type === 'presence' || msg.type === 'clients') {
+      // Clear old remote records but keep 'this tab' reference safe if you want
+      // Or just wipe and rebuild completely from backend state:
+      const backendClients = msg.payload.clients || []; // Adjust based on your JSON structure
+
+      // Wipe current tracking
+      for (const key in clients) delete clients[key];
+
+      backendClients.forEach(c => {
+        // c.id and c.room should match what your Go struct emits
+        clients[c.id] = {
+          id: c.id,
+          room: c.room || '—',
+          isMe: c.id === clientId
+        };
+      });
+
+      document.getElementById('statClients').textContent = Object.keys(clients).length;
+      renderClients();
+      renderRooms();
+    }
+  } catch (err) {
+    // Not JSON or missing fields, safe to ignore for UI state mapping
+  }
+};
+    ws.onclose = e => {
+      setStatus('disconnected');
+      document.getElementById('connectBtn').innerHTML = '<i class="ti ti-plug" aria-hidden="true"></i> Connect';
+      document.getElementById('connectBtn').className = 'btn primary';
+      addLog('sys', 'Disconnected — code ' + e.code);
+      setGated(false);
+      delete clients[clientId];
+      renderClients();
+    };
+    ws.onerror = () => addLog('err', 'WebSocket error — check DevTools console');
+  } catch (err) {
+    addLog('err', err.message);
+  }
+}
+
+function setGated(on) {
+  ['roomInput','joinBtn','msgType','targetRoom','chatText',
+   'senderField','previewBtn','sendBtn','sendRawBtn','rawFrame']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !on; });
+  document.getElementById('connectHint').classList.toggle('hidden', on);
+}
+
+function setStatus(s) {
+  const p = document.getElementById('statusPill');
+  p.textContent = s; p.className = 'pill ' + s;
+}
+
+function joinRoom() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const id = document.getElementById('roomInput').value.trim();
+  if (!id) return;
+  if (!rooms.includes(id)) rooms.push(id);
+  selectRoom(id);
+  wsSend({ type: 'join', payload: { room_id: id } });
+  document.getElementById('roomInput').value = '';
+  upsertClient(clientId, id);
+}
+
+function selectRoom(id) {
+  activeRoom = id;
+  renderRooms();
+  const sel = document.getElementById('targetRoom');
+  if (sel) sel.value = id;
+}
+
+function renderRooms() {
+  const list = document.getElementById('roomList');
+  const sel  = document.getElementById('targetRoom');
+  document.getElementById('statRooms').textContent = rooms.length;
+  if (!rooms.length) {
+    list.innerHTML = '<div class="empty-rooms"><i class="ti ti-topology-star-3" aria-hidden="true"></i>No rooms joined yet</div>';
+    if (sel) sel.innerHTML = '<option value="">— none —</option>';
+    return;
+  }
+  list.innerHTML = rooms.map(r =>
+    '<div class="room-item ' + (r===activeRoom?'active':'') + '" onclick="selectRoom(\'' + esc(r) + '\')">' +
+    '<i class="ti ti-hash hash" aria-hidden="true"></i>' +
+    '<span class="room-name">' + esc(r) + '</span>' +
+    '<span class="client-badge">' + countClientsInRoom(r) + '</span>' +
+    '</div>'
+  ).join('');
+  if (sel) {
+    sel.innerHTML = '<option value="">— none —</option>' +
+      rooms.map(r => '<option value="' + esc(r) + '"' + (r===activeRoom?' selected':'') + '>' + esc(r) + '</option>').join('');
+  }
+}
+
+function countClientsInRoom(rid) {
+  return Object.values(clients).filter(c => c.room === rid).length;
+}
+
+function onTypeChange() {
+  const t = document.getElementById('msgType').value;
+  document.getElementById('textFields').style.display = (t==='chat'||t==='custom') ? '' : 'none';
+}
+
+function buildPayload() {
+  const type   = document.getElementById('msgType').value;
+  const roomId = document.getElementById('targetRoom').value;
+  const text   = document.getElementById('chatText').value.trim();
+  const sender = document.getElementById('senderField').value.trim() || clientId;
+  if (type==='chat')  return {type:'chat', payload:{room_id:roomId,text,sender}};
+  if (type==='join')  return {type:'join', payload:{room_id:roomId}};
+  if (type==='leave') return {type:'leave',payload:{room_id:roomId}};
+  return {type:'custom',payload:{room_id:roomId,text,sender}};
+}
+
+function previewPayload() {
+  const pre = document.getElementById('jsonPreview');
+  pre.textContent = JSON.stringify(buildPayload(), null, 2);
+  pre.classList.toggle('visible');
+}
+
+function sendMessage() {
+  if (wsSend(buildPayload())) {
+    document.getElementById('chatText').value = '';
+    document.getElementById('jsonPreview').classList.remove('visible');
+  }
+}
+
+function sendRaw() {
+  const raw = document.getElementById('rawFrame').value.trim();
+  if (!raw) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) { addLog('err','Not connected'); return; }
+  ws.send(raw); sentCount++;
+  document.getElementById('statSent').textContent = sentCount;
+  addLog('out', raw);
+  const pre = document.getElementById('rawPreview');
+  try { pre.textContent = JSON.stringify(JSON.parse(raw),null,2); pre.classList.add('visible'); }
+  catch(_) { pre.classList.remove('visible'); }
+}
+
+function formatRaw() {
+  const el = document.getElementById('rawFrame');
+  try { el.value = JSON.stringify(JSON.parse(el.value),null,2); }
+  catch(e) { addLog('err','Invalid JSON: '+e.message); }
+}
+
+function wsSend(frame) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) { addLog('err','Not connected'); return false; }
+  const s = typeof frame==='string' ? frame : JSON.stringify(frame);
+  ws.send(s); sentCount++;
+  document.getElementById('statSent').textContent = sentCount;
+  addLog('out', s);
+  return true;
+}
+
+function upsertClient(id, room) {
+  clients[id] = {id, room: room||'—'};
+  document.getElementById('statClients').textContent = Object.keys(clients).length;
+  renderClients(); renderRooms();
+}
+
+function renderClients() {
+  const grid = document.getElementById('clientsGrid');
+  const entries = Object.values(clients);
+  if (!entries.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:4px 0;">No clients connected.</div>'; return; }
+  grid.innerHTML = entries.map(c =>
+    '<div class="client-row"><div class="dot"></div><span class="client-id">' + esc(c.id) +
+    '</span><span class="client-room-tag">#' + esc(c.room) +
+    '</span><span class="client-note">this tab</span></div>'
+  ).join('');
+}
+
+function addLog(dir, body) {
+  const log = document.getElementById('msgLog');
+  const atBottom = log.scrollHeight - log.clientHeight <= log.scrollTop + 8;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = '<span class="log-ts">'+ts()+'</span><span class="log-dir '+dir+'">'+dir.toUpperCase()+'</span><span class="log-body">'+esc(body)+'</span>';
+  log.appendChild(entry);
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function clearLog() { document.getElementById('msgLog').innerHTML = ''; }
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function ts() {
+  const d = new Date();
+  return d.toTimeString().slice(0,8)+'.'+String(d.getMilliseconds()).padStart(3,'0');
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

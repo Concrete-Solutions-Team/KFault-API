@@ -12,15 +12,16 @@ type Client struct {
 	Conn   *websocket.Conn
 	RoomID string `json:"room_id"`
 	Send   chan []byte
-	Auth *auth.AuthInfo
+	Auth   *auth.AuthInfo
 }
 
 const (
-	TypeChat    MessageType = "chat"
-	TypeSystem  MessageType = "system"
-	TypeJoin    MessageType = "join"
-	TypeLeave   MessageType = "leave"
-	TypeHistory MessageType = "history"
+	TypeChat     MessageType = "chat"
+	TypeSystem   MessageType = "system"
+	TypeJoin     MessageType = "join"
+	TypeLeave    MessageType = "leave"
+	TypeHistory  MessageType = "history"
+	TypePresence MessageType = "presence"
 )
 
 type MessageType string
@@ -28,7 +29,6 @@ type MessageType string
 type Message struct {
 	Type    MessageType     `json:"type"`
 	Payload json.RawMessage `json:"payload"`
-	RoomID  string          `json:"room_id"`
 }
 
 type ChatPayload struct {
@@ -41,7 +41,6 @@ type JoinPayload struct {
 	RoomID string `json:"room_id"`
 	Sender string `json:"sender"`
 }
-
 type HistoryPayload struct {
 	Messages []StoredMessage `json:"messages"`
 }
@@ -55,7 +54,8 @@ type StoredMessage struct {
 }
 
 type SystemPayload struct {
-	Text string `json:"text"`
+	Message string `json:"message"`
+	RoomID  string `json:"room_id"`
 }
 
 func mustMarshal(v any) json.RawMessage {

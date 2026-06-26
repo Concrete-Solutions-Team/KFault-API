@@ -20,7 +20,7 @@ func (s *Server) MountEndpoints(repo *auth.Repository, authHandler *auth.Handler
 		messages.ServeWS(hub, wsRepo, w, r)
 	})
 	s.router.HandleFunc("/w", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
+		http.ServeFile(w, r, "./ui/ws.html")
 	})
 
 	s.router.Post("/auth/register", authHandler.Register)

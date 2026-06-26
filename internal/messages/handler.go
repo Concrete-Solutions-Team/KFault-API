@@ -13,6 +13,11 @@ type RegPayload struct {
 	RoomID string `json:"room_id"`
 }
 
+type Sub struct {
+	Client *Client
+	RoomID string
+}
+
 func (h *Hub) Handle(msg Message, sender *Client) {
 	switch msg.Type {
 	case TypeChat:
@@ -35,8 +40,11 @@ func (h *Hub) Handle(msg Message, sender *Client) {
 			return
 		}
 		log.Printf("joim room_id: [%s]", payload.RoomID)
-		sender.RoomID = payload.RoomID
-		h.Register<-sender
+
+		h.Register <- &Sub{
+			Client: sender,
+			RoomID: payload.RoomID,
+		}
 
 	default:
 		log.Println("unknown message type:", msg.Type)
