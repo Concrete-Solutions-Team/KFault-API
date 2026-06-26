@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (h *Handler) getAuthInfo(r *http.Request) (*AuthInfo, error) {
+func GetAuthInfo(r *http.Request) (*AuthInfo, error) {
 	val := r.Context().Value(AuthContextKey)
 	if val == nil {
 		return nil, fmt.Errorf("no auth info in context")
@@ -32,5 +32,24 @@ func (h *Handler) setAuthCookie(w http.ResponseWriter, token string) {
 		Secure:   isSecure,
 		SameSite: sameSite,
 		Path:     "/",
+	})
+}
+
+func (h *Handler) clearAuthCookie(w http.ResponseWriter) {
+	sameSite := http.SameSiteLaxMode
+	// check for secure http
+	isSecure := strings.HasPrefix(h.frontendURL, "https://")
+	if isSecure {
+		sameSite = http.SameSiteNoneMode
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   isSecure,
+		SameSite: sameSite,
 	})
 }

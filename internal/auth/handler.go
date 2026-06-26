@@ -90,7 +90,7 @@ type ProfileResponse struct {
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
-	authInfo, err := h.getAuthInfo(r)
+	authInfo, err := GetAuthInfo(r)
 	if err != nil || authInfo == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -106,7 +106,7 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
-	authInfo, err := h.getAuthInfo(r)
+	authInfo, err := GetAuthInfo(r)
 	if err != nil || authInfo == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -119,8 +119,7 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 		Token: authInfo.Token,
 	}
 
-	// set cookie to none
-	h.setAuthCookie(w, "")
+	h.clearAuthCookie(w)
 
 	helpers.SendJSON(w, http.StatusOK, profile)
 }
