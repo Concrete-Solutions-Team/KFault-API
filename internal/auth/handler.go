@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/helpers"
 )
@@ -20,16 +19,18 @@ type AuthRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
 type AuthResponse struct {
 	Username string `json:"username"`
 	Message  string `json:"message"`
 }
 
 type Handler struct {
-	service *Service
+	service     *Service
+	frontendURL string
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, frontendURL string) *Handler {
 	return &Handler{service: service}
 }
 
@@ -49,7 +50,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SetAuthCookie(w, token)
+	h.setAuthCookie(w, token)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err = json.NewEncoder(w).Encode(&AuthResponse{
@@ -74,7 +75,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
-	SetAuthCookie(w, token)
+	h.setAuthCookie(w, token)
 
 	helpers.SendJSON(w, http.StatusOK, &AuthResponse{
 		Username: req.Username,
@@ -118,16 +119,7 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 		Token: authInfo.Token,
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    "",
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-	})
+	h.clearAuthCookie(w)
 
 	helpers.SendJSON(w, http.StatusOK, profile)
 }
