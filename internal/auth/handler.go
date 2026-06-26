@@ -31,7 +31,10 @@ type Handler struct {
 }
 
 func NewHandler(service *Service, frontendURL string) *Handler {
-	return &Handler{service: service}
+	return &Handler{
+		service:     service,
+		frontendURL: frontendURL,
+	}
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
