@@ -44,6 +44,7 @@ func (h *Handler) clearAuthCookie(w http.ResponseWriter) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
