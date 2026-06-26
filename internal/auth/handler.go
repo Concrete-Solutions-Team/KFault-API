@@ -31,10 +31,14 @@ type Handler struct {
 }
 
 func NewHandler(service *Service, frontendURL string) *Handler {
+<<<<<<< HEAD
 	return &Handler{
 		service:     service,
 		frontendURL: frontendURL,
 	}
+=======
+	return &Handler{service: service}
+>>>>>>> 1d0ef36 (fix: proper cookie set in safari)
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +97,7 @@ type ProfileResponse struct {
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
-	authInfo, err := GetAuthInfo(r)
+	authInfo, err := h.getAuthInfo(r)
 	if err != nil || authInfo == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -109,7 +113,7 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
-	authInfo, err := GetAuthInfo(r)
+	authInfo, err := h.getAuthInfo(r)
 	if err != nil || authInfo == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -122,7 +126,12 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 		Token: authInfo.Token,
 	}
 
+<<<<<<< HEAD
 	h.clearAuthCookie(w)
+=======
+	// set cookie to none
+	h.setAuthCookie(w, "")
+>>>>>>> 1d0ef36 (fix: proper cookie set in safari)
 
 	helpers.SendJSON(w, http.StatusOK, profile)
 }
