@@ -61,6 +61,9 @@ func (h *Hub) Handle(msg Message, sender *Client) {
 			Client: sender,
 			RoomID: payload.RoomID,
 		}
+	case TypePresence:
+		log.Printf("sending presence request")
+		h.Presence <- sender
 	default:
 		log.Println("unknown message type:", msg.Type)
 

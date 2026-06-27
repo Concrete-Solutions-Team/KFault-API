@@ -58,6 +58,11 @@ type SystemPayload struct {
 	RoomID  string `json:"room_id"`
 }
 
+type ClientInfo struct {
+	Username string `json:"username"`
+}
+
+
 func mustMarshal(v any) json.RawMessage {
 	b, _ := json.Marshal(v)
 	return b

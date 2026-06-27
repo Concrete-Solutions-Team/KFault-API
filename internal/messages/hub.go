@@ -18,6 +18,7 @@ type Hub struct {
 	Broadcast  chan Message
 	Register   chan *Sub
 	Unregister chan *Sub
+	Presence   chan *Client
 	Repo       *Repository
 }
 
@@ -40,6 +41,7 @@ func NewHub(repo *Repository) *Hub {
 		Broadcast:  make(chan Message, 1024),
 		Register:   make(chan *Sub, 256),
 		Unregister: make(chan *Sub, 256),
+		Presence:   make(chan *Client, 256),
 		Rooms:      make(map[string]map[*Client]bool),
 		Repo:       repo,
 	}
@@ -51,7 +53,7 @@ func (h *Hub) Run() {
 		case sub := <-h.Register:
 			client := sub.Client
 			newRoom := sub.RoomID
-			
+
 			if newRoom == "" {
 				if _, ok := h.Clients[client]; ok {
 					log.Printf("Client already connected")
@@ -146,7 +148,6 @@ func (h *Hub) Run() {
 				continue
 			}
 			go func(roomID string) {
-
 				ctx := context.Background()
 				log.Println("async run")
 				if err = h.Repo.InsertMessage(ctx, MessageData{RoomID: roomID, Content: unm.Text, UserID: unm.Sender}); err != nil {
@@ -166,6 +167,20 @@ func (h *Hub) Run() {
 						delete(clients, client)
 					}
 				}
+			}
+		case client := <-h.Presence:
+			log.Printf("client requested presence: %v", client.Auth.Claims.UserID)
+			if room, exists := h.Rooms[client.RoomID]; exists {
+				var list []ClientInfo
+				for c := range room {
+					if c.Auth != nil {
+						list = append(list, ClientInfo{Username: c.Auth.Claims.Username})
+					}
+				}
+				client.Send <- mustMarshal(Message{
+					Type:    TypePresence,
+					Payload: mustMarshal(list),
+				})
 			}
 		}
 	}
