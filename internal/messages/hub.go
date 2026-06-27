@@ -12,9 +12,15 @@ import (
 )
 
 // hub is the boss
+
+type Room struct {
+	Clients map[*Client]bool
+	History []ChatPayload
+}
+
 type Hub struct {
 	Clients    map[*Client]bool
-	Rooms      map[string]map[*Client]bool
+	Rooms      map[string]*Room
 	Broadcast  chan Message
 	Register   chan *Sub
 	Unregister chan *Sub
@@ -42,7 +48,7 @@ func NewHub(repo *Repository) *Hub {
 		Register:   make(chan *Sub, 256),
 		Unregister: make(chan *Sub, 256),
 		Presence:   make(chan *Client, 256),
-		Rooms:      make(map[string]map[*Client]bool),
+		Rooms:      make(map[string]*Room),
 		Repo:       repo,
 	}
 }
@@ -53,20 +59,6 @@ func (h *Hub) Run() {
 		case sub := <-h.Register:
 			client := sub.Client
 			newRoom := sub.RoomID
-
-			if _, exists := h.Rooms[newRoom][client]; exists {
-				log.Println("Look, folks, this user is already in the room. They are already there! We love our users, but they don't need to join twice. It is redundant, okay? No need to join again. Tremendous.")
-				syspd := mustMarshal(SystemPayload{
-					Message: "Let me tell you, folks, an instance of this user is already in this room, folks. No need to join again. Tremendous.",
-					RoomID:  newRoom,
-				})
-				sysmsg := mustMarshal(Message{
-					Type:    TypeSystem,
-					Payload: syspd,
-				})
-				client.Send <- sysmsg
-				continue
-			}
 
 			if newRoom == "" {
 				if _, ok := h.Clients[client]; ok {
@@ -96,6 +88,67 @@ func (h *Hub) Run() {
 				continue
 			}
 
+			room, ok := h.Rooms[newRoom]
+			if !ok {
+				log.Println("Room doesn't exist")
+				syspd := mustMarshal(SystemPayload{
+					Message: "Let me tell you, folks, room instance doesnt exist. Tremendous.",
+					RoomID:  newRoom,
+				})
+				sysmsg := mustMarshal(Message{
+					Type:    TypeSystem,
+					Payload: syspd,
+				})
+				his, err := h.Repo.GetMessagesByRoom(context.Background(), newRoom, 50)
+				if err != nil {
+					log.Printf("Error on recovering history: %v", err)
+				}
+				log.Println("history: ", his)
+				h.Rooms[newRoom] = &Room{
+					Clients: make(map[*Client]bool),
+					History: his,
+				}
+
+				h.Rooms[newRoom].Clients[client] = true
+				room = h.Rooms[newRoom]
+				client.Send <- sysmsg
+
+				log.Printf("Client successfully joined new room: %s", newRoom)
+				succpd := mustMarshal(SystemPayload{
+					Message: "Succesfully joined a room",
+					RoomID:  newRoom,
+				})
+				succmsg := mustMarshal(Message{
+					Type:    TypeSystem,
+					Payload: succpd,
+				})
+				client.Send <- succmsg
+
+				hispd := mustMarshal(HistoryPayload{
+					Messages: room.History,
+				})
+				hismsg := mustMarshal(Message{
+					Type:    TypeHistory,
+					Payload: hispd,
+				})
+				client.Send <- hismsg
+				continue
+			}
+
+			if room.Clients[client] {
+				log.Println("Look, folks, this user is already in the room. They are already there! We love our users, but they don't need to join twice. It is redundant, okay? No need to join again. Tremendous.")
+				syspd := mustMarshal(SystemPayload{
+					Message: "Let me tell you, folks, an instance of this user is already in this room, folks. No need to join again. Tremendous.",
+					RoomID:  newRoom,
+				})
+				sysmsg := mustMarshal(Message{
+					Type:    TypeSystem,
+					Payload: syspd,
+				})
+				client.Send <- sysmsg
+				continue
+			}
+
 			if client.RoomID == newRoom {
 				log.Println("Already in this room, folks. No need to join again.")
 				syspd := mustMarshal(SystemPayload{
@@ -108,7 +161,8 @@ func (h *Hub) Run() {
 			}
 
 			if client.RoomID != "" {
-				if oldRoomClients, ok := h.Rooms[client.RoomID]; ok {
+				if room, ok := h.Rooms[client.RoomID]; ok {
+					oldRoomClients := room.Clients
 					delete(oldRoomClients, client)
 					log.Printf("Removed client from old room: %s", client.RoomID)
 
@@ -117,10 +171,6 @@ func (h *Hub) Run() {
 					}
 				}
 			}
-			if _, ok := h.Rooms[newRoom]; !ok {
-				h.Rooms[newRoom] = make(map[*Client]bool)
-			}
-			h.Rooms[newRoom][client] = true
 
 			client.RoomID = newRoom
 			log.Printf("Client successfully joined new room: %s", newRoom)
@@ -133,42 +183,49 @@ func (h *Hub) Run() {
 				Payload: succpd,
 			})
 			client.Send <- succmsg
-			if clients, ok := h.Rooms[newRoom]; ok {
+			hispd := mustMarshal(HistoryPayload{
+				Messages: room.History,
+			})
+			hismsg := mustMarshal(Message{
+				Type:    TypeHistory,
+				Payload: hispd,
+			})
+			client.Send <- hismsg
+			if ok {
 				var list []ClientInfo
-				if room, exists := h.Rooms[client.RoomID]; exists {
-					for c := range room {
-						if c.Auth != nil {
-							list = append(list, ClientInfo{Username: c.Auth.Claims.Username})
-						}
+				for c := range room.Clients {
+					if c.Auth != nil {
+						list = append(list, ClientInfo{Username: c.Auth.Claims.Username})
 					}
 				}
+
 				bytes := mustMarshal(list)
 				presence := mustMarshal(Message{
 					Type:    TypePresence,
 					Payload: bytes,
 				})
-				for cli := range clients {
+				for cli := range room.Clients {
 					cli.Send <- presence
 				}
 			}
 
 		case sub := <-h.Unregister:
 			client := sub.Client
-			room := sub.RoomID
+			roomToRemove := sub.RoomID
 			if _, exists := h.Clients[client]; exists {
 				delete(h.Clients, client)
 				log.Printf("Cleaned client from global registry.")
 			}
-			if room != "" {
-				if clients, ok := h.Rooms[room]; ok {
-					if _, ok := clients[client]; ok {
-						delete(clients, client)
-						log.Printf("Removed client from room: %s", room)
+			if roomToRemove != "" {
+				if room, ok := h.Rooms[roomToRemove]; ok {
+					if _, ok := room.Clients[client]; ok {
+						delete(room.Clients, client)
+						log.Printf("Removed client from room: %s", roomToRemove)
 					}
 
-					if len(clients) == 0 {
-						delete(h.Rooms, room)
-						log.Printf("Room %s is completely empty. Room deleted.", room)
+					if len(room.Clients) == 0 {
+						delete(h.Rooms, roomToRemove)
+						log.Printf("Room %s is completely empty. Room deleted.", roomToRemove)
 					}
 				}
 			}
@@ -183,29 +240,33 @@ func (h *Hub) Run() {
 			if err != nil {
 				continue
 			}
+			room, ok := h.Rooms[unm.RoomID]
+			if !ok || room == nil {
+				continue
+			}
 			go func(roomID string) {
 				ctx := context.Background()
 				log.Println("async run")
-				if err = h.Repo.InsertMessage(ctx, MessageData{RoomID: roomID, Content: unm.Text, UserID: unm.Sender}); err != nil {
-					log.Printf("Error saving message to DB for room %s: %v", roomID, err)
+				if dberr := h.Repo.InsertMessage(ctx, MessageData{RoomID: roomID, Content: unm.Text, UserID: unm.Sender}); dberr != nil {
+					log.Printf("Error saving message to DB for room %s: %v", roomID, dberr)
 				}
 			}(unm.RoomID)
 
-			log.Printf("broadcasting to room %s, clients: %d", unm.RoomID, len(h.Rooms[unm.RoomID]))
+			log.Printf("broadcasting to room %s, clients: %d", unm.RoomID, len(h.Rooms[unm.RoomID].Clients))
 			payload := mustMarshal(unm)
-
+			h.Rooms[unm.RoomID].History = append(h.Rooms[unm.RoomID].History, unm)
 			msg := mustMarshal(Message{
 				Type:    TypeChat,
 				Payload: payload,
 			})
 
-			if clients, ok := h.Rooms[unm.RoomID]; ok {
-				for client := range clients {
+			if room, ok := h.Rooms[unm.RoomID]; ok {
+				for client := range room.Clients {
 					select {
 					case client.Send <- msg:
 					default:
 						close(client.Send)
-						delete(clients, client)
+						delete(room.Clients, client)
 					}
 				}
 			}
@@ -213,7 +274,7 @@ func (h *Hub) Run() {
 			log.Printf("client requested presence: %v", client.Auth.Claims.UserID)
 			if room, exists := h.Rooms[client.RoomID]; exists {
 				var list []ClientInfo
-				for c := range room {
+				for c := range room.Clients {
 					if c.Auth != nil {
 						list = append(list, ClientInfo{Username: c.Auth.Claims.Username})
 					}

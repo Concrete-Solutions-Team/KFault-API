@@ -42,7 +42,7 @@ type JoinPayload struct {
 	Sender string `json:"sender"`
 }
 type HistoryPayload struct {
-	Messages []StoredMessage `json:"messages"`
+	Messages []ChatPayload `json:"messages"`
 }
 
 type StoredMessage struct {
