@@ -55,13 +55,14 @@ func (h *Hub) Run() {
 			newRoom := sub.RoomID
 
 			if _, exists := h.Rooms[newRoom][client]; exists {
-				log.Println("An instance of this user is already in this room, folks. No need to join again. Tremendous.")
+				log.Println("Look, folks, this user is already in the room. They are already there! We love our users, but they don't need to join twice. It is redundant, okay? No need to join again. Tremendous.")
+				syspd := mustMarshal(SystemPayload{
+					Message: "Let me tell you, folks, an instance of this user is already in this room, folks. No need to join again. Tremendous.",
+					RoomID:  newRoom,
+				})
 				sysmsg := mustMarshal(Message{
-					Type: TypeSystem,
-					Payload: mustMarshal(SystemPayload{
-						Message: "Let me tell you, folks, an instance of this user is already in this room, folks. No need to join again. Tremendous.",
-						RoomID:  newRoom,
-					}),
+					Type:    TypeSystem,
+					Payload: syspd,
 				})
 				client.Send <- sysmsg
 				continue
@@ -70,24 +71,26 @@ func (h *Hub) Run() {
 			if newRoom == "" {
 				if _, ok := h.Clients[client]; ok {
 					log.Printf("Client already connected")
-					succmsg := mustMarshal(Message{
-						Type: TypeSystem,
-						Payload: mustMarshal(SystemPayload{
-							Message: "Client already connected",
-							RoomID:  newRoom,
-						}),
+					syspd := mustMarshal(SystemPayload{
+						Message: "Client already connected",
+						RoomID:  newRoom,
 					})
-					client.Send <- succmsg
+					msg := mustMarshal(Message{
+						Type:    TypeSystem,
+						Payload: syspd,
+					})
+					client.Send <- msg
 				}
 
 				h.Clients[client] = true
 				log.Printf("Client connected first-time")
+				syspd := mustMarshal(SystemPayload{
+					Message: "Client connected",
+					RoomID:  newRoom,
+				})
 				succmsg := mustMarshal(Message{
-					Type: TypeSystem,
-					Payload: mustMarshal(SystemPayload{
-						Message: "Client connected",
-						RoomID:  newRoom,
-					}),
+					Type:    TypeSystem,
+					Payload: syspd,
 				})
 				client.Send <- succmsg
 				continue
@@ -95,11 +98,12 @@ func (h *Hub) Run() {
 
 			if client.RoomID == newRoom {
 				log.Println("Already in this room, folks. No need to join again.")
-				sysmsg := mustMarshal(SystemPayload{
+				syspd := mustMarshal(SystemPayload{
 					Message: "client already in the room",
 					RoomID:  newRoom,
 				})
-				client.Send <- mustMarshal(Message{Type: TypeSystem, Payload: sysmsg})
+				sysmsg := mustMarshal(Message{Type: TypeSystem, Payload: syspd})
+				client.Send <- sysmsg
 				continue
 			}
 
@@ -120,12 +124,13 @@ func (h *Hub) Run() {
 
 			client.RoomID = newRoom
 			log.Printf("Client successfully joined new room: %s", newRoom)
+			succpd := mustMarshal(SystemPayload{
+				Message: "Succesfully joined a room",
+				RoomID:  newRoom,
+			})
 			succmsg := mustMarshal(Message{
-				Type: TypeSystem,
-				Payload: mustMarshal(SystemPayload{
-					Message: "Succesfully joined a room",
-					RoomID:  newRoom,
-				}),
+				Type:    TypeSystem,
+				Payload: succpd,
 			})
 			client.Send <- succmsg
 			if clients, ok := h.Rooms[newRoom]; ok {
@@ -185,14 +190,19 @@ func (h *Hub) Run() {
 					log.Printf("Error saving message to DB for room %s: %v", roomID, err)
 				}
 			}(unm.RoomID)
+
 			log.Printf("broadcasting to room %s, clients: %d", unm.RoomID, len(h.Rooms[unm.RoomID]))
+			payload := mustMarshal(unm)
+
+			msg := mustMarshal(Message{
+				Type:    TypeChat,
+				Payload: payload,
+			})
+
 			if clients, ok := h.Rooms[unm.RoomID]; ok {
 				for client := range clients {
 					select {
-					case client.Send <- mustMarshal(Message{
-						Type:    TypeChat,
-						Payload: mustMarshal(unm),
-					}):
+					case client.Send <- msg:
 					default:
 						close(client.Send)
 						delete(clients, client)
@@ -208,10 +218,14 @@ func (h *Hub) Run() {
 						list = append(list, ClientInfo{Username: c.Auth.Claims.Username})
 					}
 				}
-				client.Send <- mustMarshal(Message{
+
+				listBytes := mustMarshal(list)
+				msg := mustMarshal(Message{
 					Type:    TypePresence,
-					Payload: mustMarshal(list),
+					Payload: listBytes,
 				})
+
+				client.Send <- msg
 			}
 		}
 	}
