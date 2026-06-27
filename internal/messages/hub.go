@@ -54,6 +54,19 @@ func (h *Hub) Run() {
 			client := sub.Client
 			newRoom := sub.RoomID
 
+			if _, exists := h.Rooms[newRoom][client]; exists {
+				log.Println("An instance of this user is already in this room, folks. No need to join again. Tremendous.")
+				sysmsg := mustMarshal(Message{
+					Type: TypeSystem,
+					Payload: mustMarshal(SystemPayload{
+						Message: "Let me tell you, folks, an instance of this user is already in this room, folks. No need to join again. Tremendous.",
+						RoomID:  newRoom,
+					}),
+				})
+				client.Send <- sysmsg
+				continue
+			}
+
 			if newRoom == "" {
 				if _, ok := h.Clients[client]; ok {
 					log.Printf("Client already connected")
@@ -115,6 +128,24 @@ func (h *Hub) Run() {
 				}),
 			})
 			client.Send <- succmsg
+			if clients, ok := h.Rooms[newRoom]; ok {
+				var list []ClientInfo
+				if room, exists := h.Rooms[client.RoomID]; exists {
+					for c := range room {
+						if c.Auth != nil {
+							list = append(list, ClientInfo{Username: c.Auth.Claims.Username})
+						}
+					}
+				}
+				bytes := mustMarshal(list)
+				presence := mustMarshal(Message{
+					Type:    TypePresence,
+					Payload: bytes,
+				})
+				for cli := range clients {
+					cli.Send <- presence
+				}
+			}
 
 		case sub := <-h.Unregister:
 			client := sub.Client
