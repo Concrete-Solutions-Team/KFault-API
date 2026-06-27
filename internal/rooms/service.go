@@ -42,3 +42,19 @@ func (s *Service) GetAllRooms(ctx context.Context) ([]*RoomData, error) {
 func (s *Service) DeleteRoom(ctx context.Context, roomID string) error {
 	return s.repo.DeleteRoom(ctx, roomID)
 }
+
+func (s *Service) GetRoomByID(ctx context.Context, roomID string) (*RoomData, error) {
+	room, err := s.repo.GetRoom(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	return room, nil
+}
+
+func (s *Service) GetRoomByName(ctx context.Context, name string) (*RoomData, error) {
+	room, err := s.repo.GetRoomByName(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return room, nil
+}

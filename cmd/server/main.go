@@ -68,7 +68,7 @@ func main() {
 	roomsService := rooms.NewService(roomsRepository)
 	roomsHandler := rooms.NewHandler(roomsService)
 
-	hub := messages.NewHub(wsRepository)
+	hub := messages.NewHub(wsRepository, roomsService)
 	s := server.NewServer(cfg.Port)
 	s.MountEndpoints(authRepository, authHandler, hub, wsRepository, roomsHandler)
 

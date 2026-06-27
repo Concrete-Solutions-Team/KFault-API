@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/auth"
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/rooms"
 	"github.com/gorilla/websocket"
 )
 
@@ -19,13 +20,14 @@ type Room struct {
 }
 
 type Hub struct {
-	Clients    map[*Client]bool
-	Rooms      map[string]*Room
-	Broadcast  chan Message
-	Register   chan *Sub
-	Unregister chan *Sub
-	Presence   chan *Client
-	Repo       *Repository
+	Clients      map[*Client]bool
+	Rooms        map[string]*Room
+	Broadcast    chan Message
+	Register     chan *Sub
+	Unregister   chan *Sub
+	Presence     chan *Client
+	Repo         *Repository
+	RoomsService *rooms.Service
 }
 
 type RoomMessage struct {
@@ -41,15 +43,16 @@ var Upgrader = websocket.Upgrader{
 	},
 }
 
-func NewHub(repo *Repository) *Hub {
+func NewHub(repo *Repository, rs *rooms.Service) *Hub {
 	return &Hub{
-		Clients:    make(map[*Client]bool),
-		Broadcast:  make(chan Message, 1024),
-		Register:   make(chan *Sub, 256),
-		Unregister: make(chan *Sub, 256),
-		Presence:   make(chan *Client, 256),
-		Rooms:      make(map[string]*Room),
-		Repo:       repo,
+		Clients:      make(map[*Client]bool),
+		Broadcast:    make(chan Message, 1024),
+		Register:     make(chan *Sub, 256),
+		Unregister:   make(chan *Sub, 256),
+		Presence:     make(chan *Client, 256),
+		Rooms:        make(map[string]*Room),
+		Repo:         repo,
+		RoomsService: rs,
 	}
 }
 
@@ -90,15 +93,20 @@ func (h *Hub) Run() {
 
 			room, ok := h.Rooms[newRoom]
 			if !ok {
-				log.Println("Room doesn't exist")
-				syspd := mustMarshal(SystemPayload{
-					Message: "Let me tell you, folks, room instance doesnt exist. Tremendous.",
-					RoomID:  newRoom,
-				})
-				sysmsg := mustMarshal(Message{
-					Type:    TypeSystem,
-					Payload: syspd,
-				})
+				if _, err := h.RoomsService.GetRoomByID(context.Background(), newRoom); err != nil {
+					log.Println("Room doesn't exist")
+					syspd := mustMarshal(SystemPayload{
+						Message: "Let me tell you, folks, room instance doesnt exist. Tremendous.",
+						RoomID:  newRoom,
+					})
+					sysmsg := mustMarshal(Message{
+						Type:    TypeSystem,
+						Payload: syspd,
+					})
+					client.Send <- sysmsg
+					continue
+				}
+
 				his, err := h.Repo.GetMessagesByRoom(context.Background(), newRoom, 50)
 				if err != nil {
 					log.Printf("Error on recovering history: %v", err)
@@ -111,7 +119,6 @@ func (h *Hub) Run() {
 
 				h.Rooms[newRoom].Clients[client] = true
 				room = h.Rooms[newRoom]
-				client.Send <- sysmsg
 
 				log.Printf("Client successfully joined new room: %s", newRoom)
 				succpd := mustMarshal(SystemPayload{
