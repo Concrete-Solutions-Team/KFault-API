@@ -20,7 +20,7 @@ func AuthMiddleware(repo *auth.Repository) func(http.Handler) http.Handler {
 			cookie, err := r.Cookie("auth_token")
 			if err != nil {
 				if err == http.ErrNoCookie {
-					http.Error(w, "Cookie not found", http.StatusNotFound)
+					http.Error(w, "Cookie not found", http.StatusUnauthorized)
 					return
 				}
 				http.Error(w, "Server error", http.StatusInternalServerError)
