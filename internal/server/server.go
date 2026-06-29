@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 )
 
 type Server struct {
@@ -19,7 +20,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(port string) *Server {
+func NewServer(port, frontendURL string) *Server {
 	s := &Server{
 		router: chi.NewRouter(),
 	}
@@ -35,6 +36,14 @@ func NewServer(port string) *Server {
 	}
 
 	s.httpServer = httpServer
+
+	// enable CORS
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{frontendURL},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	}))
 
 	return s
 }

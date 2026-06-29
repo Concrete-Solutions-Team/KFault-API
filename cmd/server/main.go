@@ -13,6 +13,8 @@ import (
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/rooms"
 	"github.com/Concrete-Solutions-Team/KFault-API/internal/server"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Concrete-Solutions-Team/KFault-API/internal/storage"
 )
 
 func CleanupExpiredTokens(ctx context.Context, db *pgxpool.Pool) error {
@@ -51,16 +53,22 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 
+	str := storage.NewStorage(
+		cfg.S3AccountID,
+		cfg.S3AccessKeyID,
+		cfg.S3AccessKeySecret,
+		cfg.S3BucketName,
+	)
+
+	// str.SaveObjects()
+	strHandler := storage.NewHandler(str)
 
 	pool := db.InitPostgres(cfg.DatabaseURL)
 	StartCleanup(ctx, pool)
 
-	// r.Post("/auth/register", handler.HandleRegister)
-	// r.Post("/auth/login", handler.HandleLogin)
-	// r.Post("/auth/me", handler.HandleMe)
 	authRepository := auth.NewRepository(pool)
 	authService := auth.NewService(authRepository)
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, cfg.FrontendURL)
 
 	wsRepository := messages.NewRepository(pool)
 
@@ -73,6 +81,8 @@ func main() {
 	s.MountEndpoints(authRepository, authHandler, hub, wsRepository, roomsHandler)
 
 	go hub.Run()
+	s := server.NewServer(cfg.Port, cfg.FrontendURL)
+	s.MountEndpoints(authRepository, authHandler, strHandler)
 
 	if err := s.Start(); err != nil {
 		log.Println(err)

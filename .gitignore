@@ -16,3 +16,6 @@ bin/
 # os
 .DS_Store
 Thumbs.db
+
+# binaries
+app
